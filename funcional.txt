@@ -1,0 +1,55 @@
+import cv2
+import numpy as np
+from tensorflow.keras.models import load_model
+
+# 📥 Cargar modelo entrenado
+modelo = load_model("modelo_emociones_clases_detectadas.h5")
+
+# 📚 Ajusta según cómo entrenaste tu modelo
+clases = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral']
+
+# 📸 Inicializar webcam
+cam = cv2.VideoCapture(0)
+
+# 😮 Detección de rostros con Haar Cascade
+face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+
+print("Presiona 'q' para salir...")
+
+while True:
+    ret, frame = cam.read()
+    if not ret:
+        break
+
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+
+    for (x, y, w, h) in faces:
+        roi = gray[y:y+h, x:x+w]
+        roi_resized = cv2.resize(roi, (48, 48))
+        roi_normalized = roi_resized.astype("float32") / 255.0
+        roi_reshape = np.expand_dims(roi_normalized, axis=(0, -1))  # (1, 48, 48, 1)
+
+        # 🤖 Predicción
+        pred = modelo.predict(roi_reshape, verbose=0)
+        emotion_index = np.argmax(pred)
+
+        # 🛡 Validación de índice
+        if emotion_index < len(clases):
+            emotion = clases[emotion_index]
+        else:
+            emotion = "desconocido"
+
+        # 🔲 Mostrar rostro y emoción
+        cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
+        cv2.putText(frame, emotion, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+
+    # 🖼 Mostrar resultado
+    cv2.imshow("Detección de Emociones", frame)
+
+    # ❌ Salir con 'q'
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cam.release()
+cv2.destroyAllWindows()
